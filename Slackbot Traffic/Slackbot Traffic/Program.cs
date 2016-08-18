@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Nancy.Hosting.Self;
-using ServiceStack.Text;
 using SlackAPI;
 
 namespace Slackbot_Traffic
