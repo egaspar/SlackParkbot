@@ -16,11 +16,12 @@ namespace Slackbot_Traffic
 
 		// this is the parkbot token, it only responds to private messages
 		// configure here: https://carspaceinvaders.slack.com/services/B22DLAZA7
-		private const string ParkbotToken = "xoxb-70462373491-J4akF2VoWI8Pv0K4zNpFbsyk";
+		private const string ParkbotToken = "xoxb-70462373491-3i42LI2lO6IPRlDOLzzcHfP5";
 
-		// this token is for testing, I think it listens to all channels
-		// configure here: https://api.slack.com/docs/oauth-test-tokens
-		private const string TestToken = "xoxp-69743982737-70052309687-70509175045-060f534a15";
+        // this token is for testing, I think it listens to all channels
+        // configure here: https://api.slack.com/docs/oauth-test-tokens
+        private const string TestToken = "xoxp-69743982737-70052309687-70509175045-060f534a15";
+
 
 		public void Run()
 		{
@@ -58,6 +59,20 @@ namespace Slackbot_Traffic
 					postClient.Post(testMessage);
 				}
 				// EXAMPLE message end
+
+
+                // Example alter message. Any user who sends the ALERT command, post to all users that parking inspectors have been spotted
+                if (message.subtype.Equals("ALERT") || !message.subtype.Equals("bot_message"))
+                {
+                    SlackMessage alertMessage = new SlackMessage
+                    {
+
+
+                    }
+
+
+
+                }
 
 			};
 
