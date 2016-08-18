@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-//using Nancy.Hosting.Self;
-using ServiceStack.Text;
 using SlackAPI;
 
 namespace Slackbot_Traffic
@@ -15,6 +13,8 @@ namespace Slackbot_Traffic
 		{
 			Slack slack = new Slack();
 			slack.Run();
+			Console.WriteLine("Press <Enter> to exit");
+			Console.ReadLine();
 		}
 		
 	}
