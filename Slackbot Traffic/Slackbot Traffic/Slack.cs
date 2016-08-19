@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Timers;
 using System.Text;
+using System.Timers;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -20,11 +20,14 @@ namespace Slackbot_Traffic
 
 		// this is the parkbot token, it only responds to private messages
 		// configure here: https://carspaceinvaders.slack.com/services/B22DLAZA7
-		private const string ParkbotToken = "xoxb-70462373491-AkROjPVV7K4jxLbnlTBQqSoT";
+		private const string ParkbotToken = "xoxb-70462373491-LcDHI0SeXyHyWfyMFeQ8LnOU";
 
 		// this token is for testing, I think it listens to all channels
 		// configure here: https://api.slack.com/docs/oauth-test-tokens
-		public const string TestToken = "xoxp-69743982737-70052309687-70864516548-63d8ea08dc";
+		public const string TestToken = "xoxp-69743982737-70052309687-70896054151-9504972333";
+
+		private const string SRCoords = "-37.805783, 144.944801";
+		private const string JolimontStationCoords = "-37.816318, 144.983403";
 
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
@@ -68,7 +71,9 @@ namespace Slackbot_Traffic
 
 		internal enum CommandEnum
 		{
-			List
+			List,
+			Alert,
+			Go
 		}
 
 		#endregion Commands
@@ -178,6 +183,47 @@ namespace Slackbot_Traffic
 					};
 					m_postClient.Post(testMessage);
 				}
+
+				if (message.text.Equals(CommandEnum.Alert.ToString(), StringComparison.OrdinalIgnoreCase))
+				{
+					if (m_parkedUsers.Count > 0)
+					{
+						List<String> userlist = new List<string>();
+						foreach (KeyValuePair<string, ParkedUser> parkeduser in m_parkedUsers)
+						{
+							userlist.Add(parkeduser.Value.Channel);
+						}
+
+						ParkedUser user = m_parkedUsers[message.user];
+						user.AlertTime = DateTime.Now;
+
+						SlackMessage alertMessage = new SlackMessage
+						{
+							Text = $"Parking Inspectors have been spotted in the area at {user.AlertTime.ToString()}",
+							IconEmoji = Emoji.Warning,
+						};
+						m_postClient.PostToChannels(alertMessage, userlist);
+					}
+				}
+
+				if (message.text.Equals(CommandEnum.Go.ToString(), StringComparison.OrdinalIgnoreCase))
+				{
+					SlackAttachment map = new SlackAttachment();
+					map.ImageUrl = "http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/Driving?waypoint.1=-37.805783,%20144.944801&waypoint.2=-37.816318,%20144.983403&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k";
+
+					List<SlackAttachment> attachments = new List<SlackAttachment>();
+					attachments.Add(map);
+
+					SlackMessage testMessage = new SlackMessage
+					{
+						Channel = message.channel,
+						Text = "Traffic data",
+						IconEmoji = Emoji.VerticalTrafficLight,
+						Username = BotName,
+						Attachments = attachments
+					};
+					m_postClient.Post(testMessage);
+				}
 			};
 
 			//while (true)
@@ -194,8 +240,6 @@ namespace Slackbot_Traffic
 
 			//Console.WriteLine("Press \'q\' to quit the sample.");
 			//while (Console.Read() != 'q') ;
-
-
 		}
 
 		#endregion Executor
@@ -210,9 +254,9 @@ namespace Slackbot_Traffic
 			// check if any car park is expiring
 
 			Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
-			
+
 			// loop through each ParkedUser
-			foreach(var user in m_parkedUsers)
+			foreach (var user in m_parkedUsers)
 			{
 				// check if user parking has expired
 			}
@@ -221,7 +265,6 @@ namespace Slackbot_Traffic
 		//private TimeSpan CalculateDuration(string parkingTime)
 		//{
 		//	parkingTime.IndexOf("P");
-
 
 		//}
 
@@ -235,6 +278,6 @@ namespace Slackbot_Traffic
 			return expiryTime >= now;
 		}
 
-		#endregion
+		#endregion Timer Methods
 	}
 }
