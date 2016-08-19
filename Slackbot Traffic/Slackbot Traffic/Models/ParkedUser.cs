@@ -16,6 +16,8 @@ namespace Slackbot_Traffic.Models
 		public DateTime TimeOut { get; set; }
 
 		public Slack.ParkingTimeEnum ParkingDuration { get; set; } = Slack.ParkingTimeEnum.Out;
+
+		public string Duration { get; set; }
 		
 		public void FillInDetailsFromSlack()
 		{
