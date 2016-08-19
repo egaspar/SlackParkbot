@@ -80,6 +80,10 @@ namespace Slackbot_Traffic
 		{
 			List,
 			Alert,
+			[Description("Go Driving")]
+			GoDriving,
+			[Description("Go Transit")]
+			GoTransit,
 			Go
 		}
 
@@ -213,18 +217,30 @@ namespace Slackbot_Traffic
 					}
 				}
 
-				if (message.text.Equals(CommandEnum.Go.ToString(), StringComparison.OrdinalIgnoreCase))
+				if (message.text.Equals(EnumHelper.EnumDescription(CommandEnum.GoDriving), StringComparison.OrdinalIgnoreCase) ||
+					message.text.Equals(EnumHelper.EnumDescription(CommandEnum.GoTransit), StringComparison.OrdinalIgnoreCase) ||
+					message.text.Equals(CommandEnum.Go.ToString(), StringComparison.OrdinalIgnoreCase)
+					)
 				{
-					SlackAttachment map = new SlackAttachment();
-					map.ImageUrl = $"http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/Driving?waypoint.1={SRCoords}&waypoint.2={UserMapDict[message.user]}&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k";
+					string travelMode = "Driving";
+					string extraQueries = string.Empty;
 
+					if (message.text.Equals(EnumHelper.EnumDescription(CommandEnum.GoTransit), StringComparison.OrdinalIgnoreCase))
+					{
+						travelMode = "Transit";
+						extraQueries = $"&timeType=Departure&dateTime={DateHelper.Now.ToShortTimeString().Replace(" ", "")}";
+                    }
+					
+					SlackAttachment map = new SlackAttachment();
+					map.ImageUrl = $"http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/{travelMode}?waypoint.1={SRCoords}&waypoint.2={UserMapDict[message.user]}&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k{extraQueries}"; ;
+					
 					List<SlackAttachment> attachments = new List<SlackAttachment>();
 					attachments.Add(map);
 
 					SlackMessage testMessage = new SlackMessage
 					{
 						Channel = message.channel,
-						Text = "Traffic data",
+						Text = $"{travelMode} traffic data if leaving at {DateHelper.Now.ToShortTimeString()}:",
 						IconEmoji = Emoji.VerticalTrafficLight,
 						Username = BotName,
 						Attachments = attachments
