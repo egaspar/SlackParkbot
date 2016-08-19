@@ -90,7 +90,8 @@ namespace Slackbot_Traffic
 			[Description("Go Transit")]
 			GoTransit,
 
-			Go
+			Go,
+			Status
 		}
 
 		#endregion Commands
@@ -124,6 +125,11 @@ namespace Slackbot_Traffic
 				if (IsPCommand(message.text))
 				{
 					ParkedUser user = new ParkedUser();
+
+					if (m_parkedUsers.ContainsKey(message.user))
+					{
+						m_parkedUsers.Remove(message.user);
+					}
 					user.UserID = message.user;
 					user.TimeIn = DateTime.Now;
 					user.FillInDetailsFromSlack();
@@ -152,7 +158,7 @@ namespace Slackbot_Traffic
 
 						foreach (KeyValuePair<string, ParkedUser> user in m_parkedUsers)
 						{
-							sb.AppendLine($"{user.Value.UserName}\t{user.Value.TimeOut.ToShortTimeString()}");
+							sb.AppendLine($"{user.Value.UserName}\t{user.Value.TimeIn.ToShortTimeString()}\t{user.Value.Duration}");
 						}
 
 						text = sb.ToString();
@@ -211,7 +217,7 @@ namespace Slackbot_Traffic
 					map.ImageUrl = $"http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/{travelMode}?waypoint.1={SRCoords}&waypoint.2={UserMapDict[message.user]}&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k{extraQueries}"; ;
 					map.Text = $"{travelMode} traffic data if leaving at {DateHelper.Now.ToShortTimeString()}:";
 
-                    List<SlackAttachment> attachments = new List<SlackAttachment>();
+					List<SlackAttachment> attachments = new List<SlackAttachment>();
 					attachments.Add(map);
 
 					SlackMessage testMessage = new SlackMessage
@@ -220,6 +226,30 @@ namespace Slackbot_Traffic
 						IconEmoji = Emoji.VerticalTrafficLight,
 						Username = BotName,
 						Attachments = attachments
+					};
+					m_postClient.Post(testMessage);
+				}
+
+				if (message.text.Equals(CommandEnum.Status.ToString(), StringComparison.OrdinalIgnoreCase))
+				{
+					if (!m_parkedUsers.ContainsKey(message.user))
+					{
+						return;
+					}
+
+					ParkedUser user = m_parkedUsers[message.user];
+
+					TimeSpan timediff;
+					IsTimeExpired(user.TimeIn, CalculateDuration(user.Duration), out timediff);
+
+					string text = $"Hi {user.UserName}! You parked in a {user.Duration} spot at {user.TimeIn.ToShortTimeString()}. You have {Math.Round(timediff.TotalMinutes, MidpointRounding.AwayFromZero)} minutes remaining.";
+
+					SlackMessage testMessage = new SlackMessage
+					{
+						Channel = message.channel,
+						IconEmoji = Emoji.InformationSource,
+						Username = BotName,
+						Text = text
 					};
 					m_postClient.Post(testMessage);
 				}
