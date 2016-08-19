@@ -51,6 +51,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -59,9 +60,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Libraries\ConvertNice.cs" />
+    <Compile Include="Libraries\DateHelper.cs" />
     <Compile Include="Libraries\EnumHelper.cs" />
     <Compile Include="Libraries\StringHelper.cs" />
     <Compile Include="Libraries\UserHelper.cs" />
+    <Compile Include="Libraries\Utilities.cs" />
     <Compile Include="Models\ParkedUser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

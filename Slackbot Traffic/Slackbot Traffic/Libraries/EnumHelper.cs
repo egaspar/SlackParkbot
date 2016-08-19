@@ -32,5 +32,27 @@ namespace Slackbot_Traffic.Libraries
 
 			return desc;
 		}
+
+		/// <summary>
+		/// Standard date formatting options.
+		/// </summary>
+		public enum DateFormat
+		{
+			/// <summary>
+			/// The format to use for short dates e.g. '31/01/2000'. Used for displaying dates in grids and reports.
+			/// </summary>
+			Short,
+
+			/// <summary>
+			/// The format to use for medium dates e.g. 'Wed 31/01/2000'. Used for date data entry.
+			/// </summary>
+			Medium,
+
+			/// <summary>
+			/// The format to use for long dates e.g. 'Wed, 31 Jan 2000'. Used for displaying dates to the user.
+			/// </summary>
+			Long
+		}
 	}
+
 }

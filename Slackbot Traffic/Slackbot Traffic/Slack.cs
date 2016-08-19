@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Timers;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -18,11 +19,11 @@ namespace Slackbot_Traffic
 
 		// this is the parkbot token, it only responds to private messages
 		// configure here: https://carspaceinvaders.slack.com/services/B22DLAZA7
-		private const string ParkbotToken = "xoxb-70462373491-3i42LI2lO6IPRlDOLzzcHfP5";
+		private const string ParkbotToken = "xoxb-70462373491-AkROjPVV7K4jxLbnlTBQqSoT";
 
 		// this token is for testing, I think it listens to all channels
 		// configure here: https://api.slack.com/docs/oauth-test-tokens
-		public const string TestToken = "xoxp-69743982737-70052309687-70856041684-3d5e52ba83";
+		public const string TestToken = "xoxp-69743982737-70052309687-70864516548-63d8ea08dc";
 
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
@@ -141,14 +142,61 @@ namespace Slackbot_Traffic
 				}
 			};
 
-			while (true)
-			{
-				// add the logic to check the time and send a SlackMessage to someone here
+			//while (true)
+			//{
+			//	// add the logic to check the time and send a SlackMessage to someone here
 
-				// also, keep a List<StarRezUsers> or something to keep the time and other info?
-			}
+			//	// also, keep a List<StarRezUsers> or something to keep the time and other info?
+			//}
+
+			System.Timers.Timer aTimer = new System.Timers.Timer();
+			aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
+			aTimer.Interval = 5000;
+			aTimer.Enabled = true;
+
+			//Console.WriteLine("Press \'q\' to quit the sample.");
+			//while (Console.Read() != 'q') ;
+
+
 		}
 
 		#endregion Executor
+
+		#region Timer Methods
+
+		// Specify what you want to happen when the Elapsed event is raised.
+		private static void OnTimedEvent(object source, ElapsedEventArgs e)
+		{
+			Console.WriteLine("Hello World!");
+
+			// check if any car park is expiring
+
+			Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
+			
+			// loop through each ParkedUser
+			foreach(var user in m_parkedUsers)
+			{
+				// check if user parking has expired
+			}
+		}
+
+		//private TimeSpan CalculateDuration(string parkingTime)
+		//{
+		//	parkingTime.IndexOf("P");
+
+
+		//}
+
+		private bool IsTimeExpired(DateTime startTime, TimeSpan duration, out TimeSpan timeDifference)
+		{
+			DateTime now = DateHelper.Now;
+			DateTime expiryTime = startTime.Add(duration);
+
+			timeDifference = expiryTime.Subtract(now);
+
+			return expiryTime >= now;
+		}
+
+		#endregion
 	}
 }
