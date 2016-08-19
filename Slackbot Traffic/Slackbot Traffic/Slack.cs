@@ -1,87 +1,186 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel;
 using Slack.Webhooks;
+using Slackbot_Traffic.Libraries;
+using Slackbot_Traffic.Models;
 using SAPI = SlackAPI;
 
 namespace Slackbot_Traffic
 {
 	public class Slack
 	{
+		#region Settings
+
 		// used for posting messages
 		// configure here: https://carspaceinvaders.slack.com/apps/A0F7XDUAZ-incoming-webhooks
 		public const string WebHookURL = "https://hooks.slack.com/services/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";
 
 		// this is the parkbot token, it only responds to private messages
 		// configure here: https://carspaceinvaders.slack.com/services/B22DLAZA7
-		private const string ParkbotToken = "xoxb-70462373491-3i42LI2lO6IPRlDOLzzcHfP5";
+		private const string ParkbotToken = "xoxb-70462373491-AkROjPVV7K4jxLbnlTBQqSoT";
 
-        // this token is for testing, I think it listens to all channels
-        // configure here: https://api.slack.com/docs/oauth-test-tokens
-        private const string TestToken = "xoxp-69743982737-70052309687-70509175045-060f534a15";
+		// this token is for testing, I think it listens to all channels
+		// configure here: https://api.slack.com/docs/oauth-test-tokens
+		public const string TestToken = "xoxp-69743982737-70052309687-70864516548-63d8ea08dc";
 
+		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
+		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
+
+		#endregion Settings
+
+		#region Declarations
+
+		private Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
+
+		private SlackClient m_postClient;
+
+		#endregion Declarations
+
+		#region Constructor
+
+		public Slack()
+		{
+			m_postClient = new SlackClient(WebHookURL);
+		}
+
+		#endregion Constructor
+
+		#region Commands
+
+		internal enum ParkingTimeEnum
+		{
+			Out,
+
+			[Description("P15")]
+			FifteenMinutes,
+
+			[Description("1P")]
+			OneHour,
+
+			[Description("2P")]
+			TwoHours,
+
+			[Description("4P")]
+			FourHours
+		}
+
+        internal enum AlertEnum
+        {
+            [Description("ALERT")]
+            Alert
+        }
+
+		#endregion Commands
+
+		#region Executor
 
 		public void Run()
 		{
-			SAPI.SlackSocketClient client = new SAPI.SlackSocketClient(ParkbotToken);
-			
-			// Connect the websocket to the Real Time Messaging API
-			client.Connect((connected) => {
+			SAPI.SlackSocketClient parkbotClient = new SAPI.SlackSocketClient(ParkbotToken);
+
+			// Connect the parkbot websocket to the Real Time Messaging API
+			parkbotClient.Connect((connected) =>
+			{
 				//This is called once the client has emitted the RTM start command
-				Console.WriteLine($"Emitted the RTM start command");
-			}, () => {
+				Console.WriteLine($"Parkbot RTM client has emitted the RTM start command");
+			}, () =>
+			{
 				//This is called once the RTM client has connected to the end point
-				Console.WriteLine($"RTM client has connected to the end point");
+				Console.WriteLine($"Parkbot RTM client has connected to the end point");
 			});
 
-
-			SlackClient postClient = new SlackClient(WebHookURL);
-
-			// this will 
-			client.OnMessageReceived += (message) =>
-			{			
+			parkbotClient.OnMessageReceived += (message) =>
+			{
 				// Parse, add if conditions, and respond as needed
 
 				// EXAMPLE message
-				if (message.subtype == null || !message.subtype.Equals("bot_message"))
+				if (message.subtype != null && message.subtype.Equals("bot_message"))
 				{
-					//Handle each message as you receive them
-					SlackMessage testMessage = new SlackMessage
-					{
-						Channel = message.channel,
-						Text = $"Hi {message.user}! You typed {message.text}.",
-						IconEmoji = Emoji.Recycle,
-						Username = "Friendly Bot",
-						
-					};
-					postClient.Post(testMessage);
+					return;
 				}
+
+				//Handle each message as you receive them
+				//SlackMessage testMessage = new SlackMessage
+				//                {
+				//                    Channel = message.channel,
+				//                    Text = $"Hi {message.user}! You typed {message.text}.",
+				//                    IconEmoji = Emoji.Recycle,
+				//                    Username = "Friendly Bot",
+				//                };
+				//                m_postClient.Post(testMessage);
 				// EXAMPLE message end
 
+				if (message.text.Equals(EnumHelper.EnumDescription(ParkingTimeEnum.FifteenMinutes), StringComparison.OrdinalIgnoreCase))
+				{
+					if (m_parkedUsers.ContainsKey(message.user))
+					{
+						ParkedUser user = m_parkedUsers[message.user];
 
-                // Example alter message. Any user who sends the ALERT command, post to all users that parking inspectors have been spotted
-                if (message.subtype.Equals("ALERT") || !message.subtype.Equals("bot_message"))
+						SlackMessage testMessage = new SlackMessage
+						{
+							Channel = message.channel,
+							Text = $"Hi {user.UserName}! You parked at {user.TimeIn} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. Would you like to update your timer?",
+							IconEmoji = Emoji.Parking,
+						};
+						m_postClient.Post(testMessage);
+					}
+					else
+					{
+						ParkedUser user = new ParkedUser();
+						user.UserID = message.user;
+						user.ParkingDuration = ParkingTimeEnum.FifteenMinutes;
+						user.TimeIn = DateTime.Now;
+						user.TimeOut = user.TimeIn.AddMinutes(15);
+						user.FillInDetailsFromSlack();
+                        user.Channel = message.channel;
+
+						m_parkedUsers.Add(user.UserID, user);
+
+						SlackMessage testMessage = new SlackMessage
+						{
+							Channel = message.channel,
+							Text = $"Hi {user.UserName}! You parked at {user.TimeIn} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I will send you a reminder 15 minutes before your time runs out.",
+							IconEmoji = Emoji.HeavyCheckMark,
+						};
+						m_postClient.Post(testMessage);
+					}
+				}
+
+
+                // After receiving ALERT message, post to all registered users that parking inspectors have been spotted
+
+                if (message.text.Equals(EnumHelper.EnumDescription(AlertEnum.Alert), StringComparison.OrdinalIgnoreCase))
                 {
-                    SlackMessage alertMessage = new SlackMessage
+                    if (m_parkedUsers.Count > 0)       
                     {
+                        List<String> userlist = new List<string>();
+                        foreach (KeyValuePair<string, ParkedUser> parkeduser in m_parkedUsers)
+                        {
+                            userlist.Add(parkeduser.Value.Channel);
+                        }
 
-
+                        ParkedUser user = m_parkedUsers[message.user];
+                        user.AlertTime = DateTime.Now;  
+                    
+                        SlackMessage alertMessage = new SlackMessage
+                        {
+                            Text = $"Parking Inspectors have been spotted in the area at {user.AlertTime.ToString()}",
+                            IconEmoji = Emoji.Warning,
+                        };
+                        m_postClient.PostToChannels(alertMessage, userlist);
                     }
-
-
-
                 }
-
 			};
 
-			while(true)
+			while (true)
 			{
 				// add the logic to check the time and send a SlackMessage to someone here
 
 				// also, keep a List<StarRezUsers> or something to keep the time and other info?
 			}
 		}
+
+		#endregion Executor
 	}
 }

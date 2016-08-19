@@ -9,11 +9,15 @@ namespace Slackbot_Traffic.Models
 		public string UserID { get; set; }
 		public string UserName { get; set; }
 
+        public string Channel { get; set; }
+
 		public string Email { get; set; }
 
 		public DateTime TimeIn { get; set; }
 
 		public DateTime TimeOut { get; set; }
+
+        public DateTime AlertTime { get; set; }
 
 		public Slack.ParkingTimeEnum ParkingDuration { get; set; } = Slack.ParkingTimeEnum.Out;
 		
