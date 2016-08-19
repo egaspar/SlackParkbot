@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
 using System.Timers;
+using System.Web;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -26,19 +27,25 @@ namespace Slackbot_Traffic
 		// configure here: https://api.slack.com/docs/oauth-test-tokens
 		public const string TestToken = "xoxp-69743982737-70052309687-70896054151-9504972333";
 
-		private const string SRCoords = "-37.805783, 144.944801";
-		private const string JolimontStationCoords = "-37.816318, 144.983403";
-
+		private const string SRCoords = "-37.805783,144.944801";
+		
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
 
 		private const string BotName = "Parkbot";
 
+		private readonly Dictionary<string, string> UserMapDict = new Dictionary<string, string>()
+		{
+			{ "U221J93L7", "-37.865379,144.971860" },
+			{ "U21MUG0MD", "-37.756241,144.908088" },
+			{ "U22CVHL04", "-37.813344,145.023207" }
+		};
+		
 		#endregion Settings
 
 		#region Declarations
 
-		private Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
+		private Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>(StringComparer.OrdinalIgnoreCase);
 
 		private SlackClient m_postClient;
 
@@ -209,7 +216,7 @@ namespace Slackbot_Traffic
 				if (message.text.Equals(CommandEnum.Go.ToString(), StringComparison.OrdinalIgnoreCase))
 				{
 					SlackAttachment map = new SlackAttachment();
-					map.ImageUrl = "http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/Driving?waypoint.1=-37.805783,%20144.944801&waypoint.2=-37.816318,%20144.983403&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k";
+					map.ImageUrl = $"http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/Driving?waypoint.1={SRCoords}&waypoint.2={UserMapDict[message.user]}&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k";
 
 					List<SlackAttachment> attachments = new List<SlackAttachment>();
 					attachments.Add(map);
