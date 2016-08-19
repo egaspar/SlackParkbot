@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Timers;
 using System.Text;
+using System.Timers;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -25,11 +25,15 @@ namespace Slackbot_Traffic
 		// this token is for testing, I think it listens to all channels
 		// configure here: https://api.slack.com/docs/oauth-test-tokens
 		public const string TestToken = "xoxp-69743982737-70052309687-70896054151-9504972333";
+		private const string SRCoords = "-37.805783, 144.944801";
+		private const string JolimontStationCoords = "-37.816318, 144.983403";
 
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
 
 		private const string BotName = "Parkbot";
+
+		
 
 		#endregion Settings
 
@@ -38,6 +42,9 @@ namespace Slackbot_Traffic
 		private Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
 
 		private SlackClient m_postClient;
+
+		private TimeSpan m_reminderTime = TimeSpan.FromMinutes(2);
+		private TimeSpan m_snoozeTime = TimeSpan.FromMinutes(1);
 
 		#endregion Declarations
 
@@ -68,7 +75,9 @@ namespace Slackbot_Traffic
 
 		internal enum CommandEnum
 		{
-			List
+			List,
+			Alert,
+			Go
 		}
 
 		#endregion Commands
@@ -207,39 +216,56 @@ namespace Slackbot_Traffic
 		// Specify what you want to happen when the Elapsed event is raised.
 		private void OnTimedEvent(object source, ElapsedEventArgs e)
 		{
-			//Console.WriteLine("Hello World!");
-
 			// check if any car park is expiring
-			
 			// loop through each ParkedUser
-			foreach(var user in m_parkedUsers)
+			foreach (var user in m_parkedUsers)
 			{
 				ParkedUser parkedUser = user.Value;
-				// check if user parking has expired
-				TimeSpan durationRegisteredByUser = CalculateDuration(parkedUser.Duration);
-				TimeSpan timeDifference;
-				bool isTimeExpired = IsTimeExpired(parkedUser.TimeIn, durationRegisteredByUser, out timeDifference);
+
+				if (parkedUser.ExpiredSent && parkedUser.ReminderSent)
+				{
+					continue;
+				}
 
 				string text;
-				
-				if (isTimeExpired)
+				TimeSpan durationRegisteredByUser = CalculateDuration(parkedUser.Duration);
+				TimeSpan timeDifference;
+
+				bool isTimeExpired = IsTimeExpired(parkedUser.TimeIn, durationRegisteredByUser, out timeDifference);
+				if (isTimeExpired && !parkedUser.ExpiredSent)
 				{
-					text = $"Your parking time has expired since {timeDifference} (in timespace unit)";
-				}
-				else
-				{
-					text = $"Your parking time will expire in {timeDifference} (in timespace unit). You better go move your car!";
+					text = $"Your parking time has just expired";
+					
+					// post message in user's parkbot
+					SlackMessage reminderMessage = new SlackMessage
+					{
+						Channel = parkedUser.Channel,
+						Text = text,
+						IconEmoji = Emoji.Notebook,
+						Username = BotName
+					};
+					m_postClient.Post(reminderMessage);
+
+					parkedUser.ExpiredSent = true;
 				}
 
-				// post message in user's parkbot
-				SlackMessage reminderMessage = new SlackMessage
+				bool isReminderRequired = IsReminderRequired(parkedUser.TimeIn, durationRegisteredByUser, out timeDifference);
+				if (isReminderRequired && !parkedUser.ReminderSent)
 				{
-					Channel = "D22FBFWTT",
-					Text = text,
-					IconEmoji = Emoji.Notebook,
-					Username = BotName
-				};
-				m_postClient.Post(reminderMessage);
+					text = $"Your parking time will expire in about {m_reminderTime} minutes. You better go move your car!";
+					
+					// post message in user's parkbot
+					SlackMessage reminderMessage = new SlackMessage
+					{
+						Channel = parkedUser.Channel,
+						Text = text,
+						IconEmoji = Emoji.Notebook,
+						Username = BotName
+					};
+					m_postClient.Post(reminderMessage);
+
+					parkedUser.ReminderSent = true;
+				}	
 			}
 		}
 
@@ -272,10 +298,24 @@ namespace Slackbot_Traffic
 			DateTime expiryTime = startTime.Add(duration);
 
 			timeDifference = expiryTime.Subtract(now);
+			long ticksDifference = expiryTime.Ticks - now.Ticks;
 
-			return expiryTime >= now;
+			return ticksDifference <= 0;
 		}
 
-		#endregion
+		private bool IsReminderRequired(DateTime startTime, TimeSpan duration, out TimeSpan timeLeft)
+		{
+			DateTime now = DateHelper.Now;
+			DateTime expiryTimeLessReminderTime = startTime.Add(duration).Subtract(m_reminderTime);
+
+			TimeSpan timeDifference = expiryTimeLessReminderTime.Subtract(now);
+			timeLeft = startTime.Add(duration).Subtract(now);
+
+			long ticksDifference = expiryTimeLessReminderTime.Ticks - now.Ticks;
+
+			return ticksDifference <= 0;
+		}
+
+		#endregion Timer Methods
 	}
 }

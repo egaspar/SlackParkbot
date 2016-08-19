@@ -11,6 +11,8 @@ namespace Slackbot_Traffic.Models
 
 		public string Email { get; set; }
 
+		public string Channel { get; set; }
+		public DateTime AlertTime { get; set; }
 		public DateTime TimeIn { get; set; }
 
 		public DateTime TimeOut { get; set; }
@@ -18,6 +20,10 @@ namespace Slackbot_Traffic.Models
 		public Slack.ParkingTimeEnum ParkingDuration { get; set; } = Slack.ParkingTimeEnum.Out;
 
 		public string Duration { get; set; }
+
+		public bool ReminderSent { get; set; }
+
+		public bool ExpiredSent { get; set; }
 		
 		public void FillInDetailsFromSlack()
 		{
@@ -25,9 +31,9 @@ namespace Slackbot_Traffic.Models
 			{
 				using (WebClient client = new WebClient())
 				{
-						dynamic response = JsonConvert.DeserializeObject(client.DownloadString($"https://slack.com/api/users.info?token={Slack.TestToken}&user={this.UserID}"));
-						this.Email = response.user.profile.email.ToString();
-						this.UserName = response.user.profile.first_name.ToString();
+					dynamic response = JsonConvert.DeserializeObject(client.DownloadString($"https://slack.com/api/users.info?token={Slack.TestToken}&user={this.UserID}"));
+					this.Email = response.user.profile.email.ToString();
+					this.UserName = response.user.profile.first_name.ToString();
 				}
 			}
 		}
