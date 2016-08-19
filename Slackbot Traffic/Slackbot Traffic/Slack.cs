@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Timers;
+using System.Text;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -28,6 +29,8 @@ namespace Slackbot_Traffic
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
 
+		private const string BotName = "Parkbot";
+
 		#endregion Settings
 
 		#region Declarations
@@ -53,17 +56,19 @@ namespace Slackbot_Traffic
 		{
 			Out,
 
-			[Description("P15")]
-			FifteenMinutes,
-
 			[Description("1P")]
-			OneHour,
+			OneHour = 1,
 
 			[Description("2P")]
-			TwoHours,
+			TwoHours = 2,
 
 			[Description("4P")]
-			FourHours
+			FourHours = 4
+		}
+
+		internal enum CommandEnum
+		{
+			List
 		}
 
 		#endregion Commands
@@ -106,7 +111,8 @@ namespace Slackbot_Traffic
 				//                m_postClient.Post(testMessage);
 				// EXAMPLE message end
 
-				if (message.text.Equals(EnumHelper.EnumDescription(ParkingTimeEnum.FifteenMinutes), StringComparison.OrdinalIgnoreCase))
+				ParkingTimeEnum parkingTimeRequest = EnumHelper.GetValueFromDescription<ParkingTimeEnum>(message.text);
+				if (parkingTimeRequest != default(ParkingTimeEnum))
 				{
 					if (m_parkedUsers.ContainsKey(message.user))
 					{
@@ -115,18 +121,23 @@ namespace Slackbot_Traffic
 						SlackMessage testMessage = new SlackMessage
 						{
 							Channel = message.channel,
-							Text = $"Hi {user.UserName}! You parked at {user.TimeIn} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. Would you like to update your timer?",
+							Text = $"Hi {user.UserName}! You parked at {user.TimeIn.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I have updated your timer to {DateTime.Now.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}.",
 							IconEmoji = Emoji.Parking,
+							Username = BotName
 						};
 						m_postClient.Post(testMessage);
+
+						user.ParkingDuration = parkingTimeRequest;
+						user.TimeIn = DateTime.Now;
+						user.TimeOut = user.TimeIn.AddHours((int)parkingTimeRequest);
 					}
 					else
 					{
 						ParkedUser user = new ParkedUser();
 						user.UserID = message.user;
-						user.ParkingDuration = ParkingTimeEnum.FifteenMinutes;
+						user.ParkingDuration = parkingTimeRequest;
 						user.TimeIn = DateTime.Now;
-						user.TimeOut = user.TimeIn.AddMinutes(15);
+						user.TimeOut = user.TimeIn.AddHours((int)parkingTimeRequest);
 						user.FillInDetailsFromSlack();
 
 						m_parkedUsers.Add(user.UserID, user);
@@ -134,11 +145,38 @@ namespace Slackbot_Traffic
 						SlackMessage testMessage = new SlackMessage
 						{
 							Channel = message.channel,
-							Text = $"Hi {user.UserName}! You parked at {user.TimeIn} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I will send you a reminder 15 minutes before your time runs out.",
+							Text = $"Hi {user.UserName}! You parked at {user.TimeIn.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I will send you a reminder 15 minutes before your time runs out.",
 							IconEmoji = Emoji.HeavyCheckMark,
+							Username = BotName
 						};
 						m_postClient.Post(testMessage);
 					}
+				}
+
+				if (message.text.Equals(CommandEnum.List.ToString(), StringComparison.OrdinalIgnoreCase))
+				{
+					string text = "No one's parked yet!";
+					if (m_parkedUsers.Count > 0)
+					{
+						StringBuilder sb = new StringBuilder();
+						sb.AppendLine("Currently parked users:");
+
+						foreach (KeyValuePair<string, ParkedUser> user in m_parkedUsers)
+						{
+							sb.AppendLine($"{user.Value.UserName}\t{user.Value.TimeOut.ToShortTimeString()}");
+						}
+
+						text = sb.ToString();
+					}
+
+					SlackMessage testMessage = new SlackMessage
+					{
+						Channel = message.channel,
+						Text = text,
+						IconEmoji = Emoji.Notebook,
+						Username = BotName
+					};
+					m_postClient.Post(testMessage);
 				}
 			};
 
