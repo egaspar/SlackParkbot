@@ -155,6 +155,7 @@ namespace Slackbot_Traffic
 						user.TimeIn = DateTime.Now;
 						user.TimeOut = user.TimeIn.AddHours((int)parkingTimeRequest);
 						user.FillInDetailsFromSlack();
+						user.Channel = message.channel;
 
 						m_parkedUsers.Add(user.UserID, user);
 
@@ -199,21 +200,24 @@ namespace Slackbot_Traffic
 				{
 					if (m_parkedUsers.Count > 0)
 					{
-						List<String> userlist = new List<string>();
+						List<String> channelList = new List<string>();
 						foreach (KeyValuePair<string, ParkedUser> parkeduser in m_parkedUsers)
 						{
-							userlist.Add(parkeduser.Value.Channel);
+							channelList.Add(parkeduser.Value.Channel);
 						}
 
 						ParkedUser user = m_parkedUsers[message.user];
 						user.AlertTime = DateTime.Now;
+						user.UserID = message.user;
+						user.FillInDetailsFromSlack();
 
 						SlackMessage alertMessage = new SlackMessage
 						{
-							Text = $"Parking Inspectors have been spotted in the area at {user.AlertTime.ToString()}",
+							Text = $"Parking Inspectors have been spotted in the area at {user.AlertTime.ToShortTimeString()} by {user.UserName}",
 							IconEmoji = Emoji.Warning,
+							Username = BotName
 						};
-						m_postClient.PostToChannels(alertMessage, userlist);
+						m_postClient.PostToChannels(alertMessage, channelList);
 					}
 				}
 
