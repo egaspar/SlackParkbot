@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Timers;
-using System.Web;
 using Slack.Webhooks;
 using Slackbot_Traffic.Libraries;
 using Slackbot_Traffic.Models;
@@ -28,7 +28,7 @@ namespace Slackbot_Traffic
 		public const string TestToken = "xoxp-69743982737-70052309687-70896054151-9504972333";
 
 		private const string SRCoords = "-37.805783,144.944801";
-		
+
 		private readonly DateTime StartTime = new DateTime(1, 1, 1, 6, 0, 0);
 		private readonly DateTime EndTime = new DateTime(1, 1, 1, 18, 0, 0);
 
@@ -40,7 +40,7 @@ namespace Slackbot_Traffic
 			{ "U21MUG0MD", "-37.756241,144.908088" },
 			{ "U22CVHL04", "-37.813344,145.023207" }
 		};
-		
+
 		#endregion Settings
 
 		#region Declarations
@@ -48,6 +48,9 @@ namespace Slackbot_Traffic
 		private Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>(StringComparer.OrdinalIgnoreCase);
 
 		private SlackClient m_postClient;
+
+		private TimeSpan m_reminderTime = TimeSpan.FromMinutes(2);
+		private TimeSpan m_snoozeTime = TimeSpan.FromMinutes(1);
 
 		#endregion Declarations
 
@@ -80,10 +83,13 @@ namespace Slackbot_Traffic
 		{
 			List,
 			Alert,
+
 			[Description("Go Driving")]
 			GoDriving,
+
 			[Description("Go Transit")]
 			GoTransit,
+
 			Go
 		}
 
@@ -110,64 +116,30 @@ namespace Slackbot_Traffic
 			{
 				// Parse, add if conditions, and respond as needed
 
-				// EXAMPLE message
 				if (message.subtype != null && message.subtype.Equals("bot_message"))
 				{
 					return;
 				}
 
-				//Handle each message as you receive them
-				//SlackMessage testMessage = new SlackMessage
-				//                {
-				//                    Channel = message.channel,
-				//                    Text = $"Hi {message.user}! You typed {message.text}.",
-				//                    IconEmoji = Emoji.Recycle,
-				//                    Username = "Friendly Bot",
-				//                };
-				//                m_postClient.Post(testMessage);
-				// EXAMPLE message end
-
-				ParkingTimeEnum parkingTimeRequest = EnumHelper.GetValueFromDescription<ParkingTimeEnum>(message.text);
-				if (parkingTimeRequest != default(ParkingTimeEnum))
+				if (IsPCommand(message.text))
 				{
-					if (m_parkedUsers.ContainsKey(message.user))
+					ParkedUser user = new ParkedUser();
+					user.UserID = message.user;
+					user.TimeIn = DateTime.Now;
+					user.FillInDetailsFromSlack();
+					user.Channel = message.channel;
+					user.Duration = message.text;
+
+					m_parkedUsers.Add(user.UserID, user);
+
+					SlackMessage testMessage2 = new SlackMessage
 					{
-						ParkedUser user = m_parkedUsers[message.user];
-
-						SlackMessage testMessage = new SlackMessage
-						{
-							Channel = message.channel,
-							Text = $"Hi {user.UserName}! You parked at {user.TimeIn.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I have updated your timer to {DateTime.Now.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}.",
-							IconEmoji = Emoji.Parking,
-							Username = BotName
-						};
-						m_postClient.Post(testMessage);
-
-						user.ParkingDuration = parkingTimeRequest;
-						user.TimeIn = DateTime.Now;
-						user.TimeOut = user.TimeIn.AddHours((int)parkingTimeRequest);
-					}
-					else
-					{
-						ParkedUser user = new ParkedUser();
-						user.UserID = message.user;
-						user.ParkingDuration = parkingTimeRequest;
-						user.TimeIn = DateTime.Now;
-						user.TimeOut = user.TimeIn.AddHours((int)parkingTimeRequest);
-						user.FillInDetailsFromSlack();
-						user.Channel = message.channel;
-
-						m_parkedUsers.Add(user.UserID, user);
-
-						SlackMessage testMessage = new SlackMessage
-						{
-							Channel = message.channel,
-							Text = $"Hi {user.UserName}! You parked at {user.TimeIn.ToShortTimeString()} for {StringHelper.CamelCaseToProperCaseWithSpace(user.ParkingDuration.ToString())}. I will send you a reminder 15 minutes before your time runs out.",
-							IconEmoji = Emoji.HeavyCheckMark,
-							Username = BotName
-						};
-						m_postClient.Post(testMessage);
-					}
+						Channel = message.channel,
+						Text = $"Hi {user.UserName}! You parked at {user.TimeIn.ToShortTimeString()} on a {user.Duration} parking spot. I will send you a reminder {m_reminderTime.ToString("%m")} minutes before your time runs out.",
+						IconEmoji = Emoji.HeavyCheckMark,
+						Username = BotName
+					};
+					m_postClient.Post(testMessage2);
 				}
 
 				if (message.text.Equals(CommandEnum.List.ToString(), StringComparison.OrdinalIgnoreCase))
@@ -233,18 +205,18 @@ namespace Slackbot_Traffic
 					{
 						travelMode = "Transit";
 						extraQueries = $"&timeType=Departure&dateTime={DateHelper.Now.ToShortTimeString().Replace(" ", "")}";
-                    }
-					
+					}
+
 					SlackAttachment map = new SlackAttachment();
 					map.ImageUrl = $"http://dev.virtualearth.net/REST/v1/Imagery/Map/Road/Routes/{travelMode}?waypoint.1={SRCoords}&waypoint.2={UserMapDict[message.user]}&maxSolutions=2&mapLayer=TrafficFlow&dcl=1&key=Auz3F4FC3_a4nAFl5yUGTlhfwnu1lgRirsrSN-kelovjPLP5w1FnJ0HkBI0yVz7k{extraQueries}"; ;
-					
-					List<SlackAttachment> attachments = new List<SlackAttachment>();
+					map.Text = $"{travelMode} traffic data if leaving at {DateHelper.Now.ToShortTimeString()}:";
+
+                    List<SlackAttachment> attachments = new List<SlackAttachment>();
 					attachments.Add(map);
 
 					SlackMessage testMessage = new SlackMessage
 					{
 						Channel = message.channel,
-						Text = $"{travelMode} traffic data if leaving at {DateHelper.Now.ToShortTimeString()}:",
 						IconEmoji = Emoji.VerticalTrafficLight,
 						Username = BotName,
 						Attachments = attachments
@@ -253,20 +225,17 @@ namespace Slackbot_Traffic
 				}
 			};
 
-			//while (true)
-			//{
-			//	// add the logic to check the time and send a SlackMessage to someone here
-
-			//	// also, keep a List<StarRezUsers> or something to keep the time and other info?
-			//}
-
 			System.Timers.Timer aTimer = new System.Timers.Timer();
 			aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
 			aTimer.Interval = 5000;
 			aTimer.Enabled = true;
+		}
 
-			//Console.WriteLine("Press \'q\' to quit the sample.");
-			//while (Console.Read() != 'q') ;
+		private bool IsPCommand(string text)
+		{
+			Regex reg = new Regex("([0-9]+P[0-9]+|[0-9]+P|P[0-9]+)");
+
+			return reg.IsMatch(text);
 		}
 
 		#endregion Executor
@@ -274,26 +243,83 @@ namespace Slackbot_Traffic
 		#region Timer Methods
 
 		// Specify what you want to happen when the Elapsed event is raised.
-		private static void OnTimedEvent(object source, ElapsedEventArgs e)
+		private void OnTimedEvent(object source, ElapsedEventArgs e)
 		{
-			Console.WriteLine("Hello World!");
-
 			// check if any car park is expiring
-
-			Dictionary<string, ParkedUser> m_parkedUsers = new Dictionary<string, ParkedUser>();
-
 			// loop through each ParkedUser
 			foreach (var user in m_parkedUsers)
 			{
-				// check if user parking has expired
+				ParkedUser parkedUser = user.Value;
+
+				if (parkedUser.ExpiredSent && parkedUser.ReminderSent)
+				{
+					continue;
+				}
+
+				string text;
+				TimeSpan durationRegisteredByUser = CalculateDuration(parkedUser.Duration);
+				TimeSpan timeDifference;
+
+				bool isTimeExpired = IsTimeExpired(parkedUser.TimeIn, durationRegisteredByUser, out timeDifference);
+				if (isTimeExpired && !parkedUser.ExpiredSent)
+				{
+					text = $"Your parking time has just expired";
+
+					// post message in user's parkbot
+					SlackMessage reminderMessage = new SlackMessage
+					{
+						Channel = parkedUser.Channel,
+						Text = text,
+						IconEmoji = Emoji.Notebook,
+						Username = BotName
+					};
+					m_postClient.Post(reminderMessage);
+
+					parkedUser.ExpiredSent = true;
+				}
+
+				bool isReminderRequired = IsReminderRequired(parkedUser.TimeIn, durationRegisteredByUser, out timeDifference);
+				if (isReminderRequired && !parkedUser.ReminderSent)
+				{
+					text = $"Your parking time will expire in about {m_reminderTime.ToString("%m")} minutes. You better go move your car!";
+
+					// post message in user's parkbot
+					SlackMessage reminderMessage = new SlackMessage
+					{
+						Channel = parkedUser.Channel,
+						Text = text,
+						IconEmoji = Emoji.Notebook,
+						Username = BotName
+					};
+					m_postClient.Post(reminderMessage);
+
+					parkedUser.ReminderSent = true;
+				}
 			}
 		}
 
-		//private TimeSpan CalculateDuration(string parkingTime)
-		//{
-		//	parkingTime.IndexOf("P");
+		private TimeSpan CalculateDuration(string parkingDurationInPNotation)
+		{
+			int index = parkingDurationInPNotation.IndexOf("P");
 
-		//}
+			string hourPart = parkingDurationInPNotation.Substring(0, index);
+			string minutesPart = parkingDurationInPNotation.Substring(index + 1, parkingDurationInPNotation.Length - (index + 1));
+
+			TimeSpan duration = TimeSpan.Zero;
+			if (hourPart.Length > 0)
+			{
+				int hours = ConvertNice.ToInteger(hourPart, 0);
+				duration += TimeSpan.FromHours(hours);
+			}
+
+			if (minutesPart.Length > 0)
+			{
+				int minutes = ConvertNice.ToInteger(minutesPart, 0);
+				duration += TimeSpan.FromMinutes(minutes);
+			}
+
+			return duration;
+		}
 
 		private bool IsTimeExpired(DateTime startTime, TimeSpan duration, out TimeSpan timeDifference)
 		{
@@ -301,8 +327,22 @@ namespace Slackbot_Traffic
 			DateTime expiryTime = startTime.Add(duration);
 
 			timeDifference = expiryTime.Subtract(now);
+			long ticksDifference = expiryTime.Ticks - now.Ticks;
 
-			return expiryTime >= now;
+			return ticksDifference <= 0;
+		}
+
+		private bool IsReminderRequired(DateTime startTime, TimeSpan duration, out TimeSpan timeLeft)
+		{
+			DateTime now = DateHelper.Now;
+			DateTime expiryTimeLessReminderTime = startTime.Add(duration).Subtract(m_reminderTime);
+
+			TimeSpan timeDifference = expiryTimeLessReminderTime.Subtract(now);
+			timeLeft = startTime.Add(duration).Subtract(now);
+
+			long ticksDifference = expiryTimeLessReminderTime.Ticks - now.Ticks;
+
+			return ticksDifference <= 0;
 		}
 
 		#endregion Timer Methods

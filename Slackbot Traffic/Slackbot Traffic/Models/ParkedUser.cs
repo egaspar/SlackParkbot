@@ -19,6 +19,12 @@ namespace Slackbot_Traffic.Models
 
 		public Slack.ParkingTimeEnum ParkingDuration { get; set; } = Slack.ParkingTimeEnum.Out;
 
+		public string Duration { get; set; }
+
+		public bool ReminderSent { get; set; }
+
+		public bool ExpiredSent { get; set; }
+		
 		public void FillInDetailsFromSlack()
 		{
 			if (!string.IsNullOrEmpty(this.UserID))
